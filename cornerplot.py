@@ -9,7 +9,8 @@ from tqdm import tqdm
 
 def CornerPlot(dfs, df_names, corner_params, weights=None, bandwidth_fac=1, thresh=[68,95], downsample=False, prior=None, \
                 cuts=None, limits=None, plot_limits=None, labels=None, ticks=None, fill=None, title=None, Nbins=50, \
-                plot_pts=False, plot_hist=False, top_axis=False, print_credible=90, colormap=None, save=False):
+                plot_pts=False, plot_hist=False, mark_median=False, mark_credible=False, top_axis=False, \
+                print_credible=90, colormap=None, save=False):
     """
     Makes a sexy cornerplot.
 
@@ -30,6 +31,8 @@ def CornerPlot(dfs, df_names, corner_params, weights=None, bandwidth_fac=1, thre
     :Nbins: number of bins (in each dimension) to use for the marginalized histograms and for constructing the 2d density
     :plot_pts: boolean that determines whether to plot scatterplot points
     :plot_hist: boolean that determines whether histogram is plotted behind marginalized KDEs
+    :mark_median: boolean that determines whether to place markers in the marginalized plots for median
+    :mark_credible: boolean that determines whether to place markers in the marginalized plots for credible intervals
     :top_axis: boolean that determines whether to plot axes labels and ticks above the marginalized panels
     :print_credible: prints the median and symmetric credible interval provided above the marginalized distributions if not False
     :colormap: allows for user-input color maps
@@ -123,12 +126,14 @@ def CornerPlot(dfs, df_names, corner_params, weights=None, bandwidth_fac=1, thre
 
             # plot median and credible range for the specified threshold values
             median = np.median(param_data)
-            marg_axs[idx].axvline(median, color=colors[df_idx], linestyle=':')
-            for tidx, t in enumerate(thresh):
-                cred_low = np.percentile(param_data, (100-t)/2.0)
-                cred_high = np.percentile(param_data, 100 - (100-t)/2.0)
-                marg_axs[idx].axvline(cred_low, color=colors[df_idx], alpha=0.6, ymin=0.95, lw=3/(tidx+1))
-                marg_axs[idx].axvline(cred_high, color=colors[df_idx], alpha=0.6, ymin=0.95, lw=3/(tidx+1))
+            if mark_median==True:
+                marg_axs[idx].axvline(median, color=colors[df_idx], linestyle=':')
+            if mark_credible==True:
+                for tidx, t in enumerate(thresh):
+                    cred_low = np.percentile(param_data, (100-t)/2.0)
+                    cred_high = np.percentile(param_data, 100 - (100-t)/2.0)
+                    marg_axs[idx].axvline(cred_low, color=colors[df_idx], alpha=0.6, ymin=0.95, lw=3/(tidx+1))
+                    marg_axs[idx].axvline(cred_high, color=colors[df_idx], alpha=0.6, ymin=0.95, lw=3/(tidx+1))
 
 
             # adjust plot limits if provided
@@ -192,7 +197,8 @@ def CornerPlot(dfs, df_names, corner_params, weights=None, bandwidth_fac=1, thre
 
                 # plot median value
                 median_joint = np.median(joint_param_data)
-                joint_ax.scatter(median, median_joint, marker='X', color=colors[df_idx], s=75)
+                if mark_median==True:
+                    joint_ax.scatter(median, median_joint, marker='X', color=colors[df_idx], s=75)
 
                 ### PLOT JOINT DISTRIBUTIONS ###
                 thresholds = [1-t/100.0 for t in thresh[::-1]]
@@ -235,8 +241,19 @@ def CornerPlot(dfs, df_names, corner_params, weights=None, bandwidth_fac=1, thre
                 # save this updated ax in the joint_axs dict
                 joint_axs[ax_key] = joint_ax
 
+    # rearrange labels and handles
+    handles, labels = marg_axs[0].get_legend_handles_labels()
+    ordered_names = df_names.copy()
+    if prior is not None:
+        ordered_names.append('prior')
+    order = []
+    for o in ordered_names:
+        order.append(np.argwhere(np.array(labels)==o)[0][0])
+    handles = [handles[o] for o in order]
+    labels = [labels[o] for o in order]
+
     # add legend
-    marg_axs[0].legend(loc='upper left', bbox_to_anchor=(len(corner_params)-0.95,1.0), prop={'size':30})
+    marg_axs[0].legend(handles, labels, loc='upper left', bbox_to_anchor=(len(corner_params)-0.95,1.0), prop={'size':30})
 
     # add title
     if title is not None:
