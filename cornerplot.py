@@ -1,5 +1,6 @@
 import numpy as np
 import pandas as pd
+import matplotlib
 import matplotlib.pyplot as plt
 from matplotlib import gridspec
 import seaborn as sns
@@ -7,7 +8,8 @@ from tqdm import tqdm
 
 
 def CornerPlot(dfs, df_names, corner_params, weights=None, bandwidth_fac=1, thresh=[68,95], downsample=False, prior=None, \
-                cuts=None, limits=None, plot_limits=None, labels=None, ticks=None, title=None, Nbins=50, plot_pts=False, plot_hist=False, print_credible=90, colormap=None, save=False):
+                cuts=None, limits=None, plot_limits=None, labels=None, ticks=None, fill=None, title=None, Nbins=50, \
+                plot_pts=False, plot_hist=False, top_axis=False, print_credible=90, colormap=None, save=False):
     """
     Makes a sexy cornerplot.
 
@@ -23,10 +25,12 @@ def CornerPlot(dfs, df_names, corner_params, weights=None, bandwidth_fac=1, thre
     :plot_limits: dict of tuples for the plotting limits of each parameter
     :labels: dict of labels to use for annotating :corner_params:
     :ticks: dict of ticks to use for each parameter
+    :fill: None, or list of colormaps that determines whether the shade in distributions for each dataframe
     :title: suptitle of the corner plot
     :Nbins: number of bins (in each dimension) to use for the marginalized histograms and for constructing the 2d density
     :plot_pts: boolean that determines whether to plot scatterplot points
     :plot_hist: boolean that determines whether histogram is plotted behind marginalized KDEs
+    :top_axis: boolean that determines whether to plot axes labels and ticks above the marginalized panels
     :print_credible: prints the median and symmetric credible interval provided above the marginalized distributions if not False
     :colormap: allows for user-input color maps
     :save: saves as `cornerplot.png` if True, or at specific path if string is provided
@@ -83,6 +87,17 @@ def CornerPlot(dfs, df_names, corner_params, weights=None, bandwidth_fac=1, thre
         # get weights, if provided
         _weights = None if weights==None else np.asarray(df[weights])
 
+        # determine whether to fill in these distributions or not
+        if fill:
+            fill_col=fill[df_idx]
+            if fill_col is not None:
+                _shade=True
+                _cmap = matplotlib.cm.get_cmap(fill_col)
+                col = _cmap(0.75)
+            else:
+                _shade=False
+                col = colors[df_idx]
+
         # loop over all parameters
         for idx, param in enumerate(corner_params):
 
@@ -90,10 +105,10 @@ def CornerPlot(dfs, df_names, corner_params, weights=None, bandwidth_fac=1, thre
             param_data = np.asarray(df[param])
 
             ### PLOT MARGINALIZED DISTRIBUTIONS ###
-            sns.kdeplot(data=param_data, ax=marg_axs[idx], weights=_weights, bw_adjust=bandwidth_fac, \
-                        gridsize=1000, clip=(_limits[param]), color=colors[df_idx], lw=2, vertical=False, label=df_names[df_idx])
+            sns.kdeplot(data=param_data, ax=marg_axs[idx], weights=_weights, bw_adjust=bandwidth_fac, gridsize=1000,
+                        clip=(_limits[param]), color=col, shade=_shade, lw=2, vertical=False, label=df_names[df_idx])
             if plot_hist==True:
-                _ = marg_axs[idx].hist(param_data, density=True, weights=_weights, histtype='step', color=colors[df_idx], bins=Nbins, \
+                _ = marg_axs[idx].hist(param_data, density=True, weights=_weights, histtype='step', color=col, bins=Nbins, \
                             alpha=0.4, orientation="vertical", label=None)
 
             # plot prior distributions, if provided
@@ -144,6 +159,22 @@ def CornerPlot(dfs, df_names, corner_params, weights=None, bandwidth_fac=1, thre
                 cred_high = np.percentile(param_data, 100 - (100-print_credible)/2.0)
                 marg_axs[idx].set_title(r'$%0.2f ^{+%0.2f} _{-%0.2f}$' % (median, cred_high-median, median-cred_low), pad=15)
 
+            # add ticks/labels to top of plot (won't do this if print_credible==True)
+            if top_axis==True and print_credible==False and df_idx==0:
+                if _labels[param] is not None:
+                    xlbl = _labels[param]
+                else:
+                    xlbl = param
+                twin_ax = marg_axs[idx].twiny()
+                twin_ax.xaxis.tick_top()
+                twin_ax.set_xlabel(xlbl, labelpad=15)
+                twin_ax.xaxis.set_label_position('top')
+                if _ticks[param] is not None:
+                    twin_ax.set_xticks(_ticks[param])
+                twin_ax.set_yticklabels([])
+                twin_ax.set_xlim(_plot_limits[param])
+                twin_ax.grid(False)
+
             # setup joint axes
             for joint_idx, joint_param in enumerate(corner_params):
                 if joint_idx <= idx:
@@ -166,9 +197,15 @@ def CornerPlot(dfs, df_names, corner_params, weights=None, bandwidth_fac=1, thre
                 ### PLOT JOINT DISTRIBUTIONS ###
                 thresholds = [1-t/100.0 for t in thresh[::-1]]
 
-                sns.kdeplot(x=param_data, y=joint_param_data, ax=joint_ax, weights=_weights, bw_adjust=bandwidth_fac, \
-                            levels=thresholds, clip=(_limits[param],_limits[joint_param]), colors=[colors[df_idx]], \
-                            cmap=None, shade=False, alpha=0.7, linewidths=np.linspace(1,3,len(thresholds)))
+                if fill_col is not None:
+                    thresholds.append(1)
+                    sns.kdeplot(x=param_data, y=joint_param_data, ax=joint_ax, weights=_weights, bw_adjust=bandwidth_fac, \
+                                levels=thresholds, clip=(_limits[param],_limits[joint_param]), \
+                                cmap=_cmap, shade=_shade, alpha=0.7, linewidths=np.linspace(1,3,len(thresholds)))
+                else:
+                    sns.kdeplot(x=param_data, y=joint_param_data, ax=joint_ax, weights=_weights, bw_adjust=bandwidth_fac, \
+                                levels=thresholds, clip=(_limits[param],_limits[joint_param]), colors=[col], \
+                                cmap=None, shade=_shade, alpha=0.7, linewidths=np.linspace(1,3,len(thresholds)))
                 if plot_pts==True:
                     joint_ax.scatter(param_data, joint_param_data, \
                                  color=colors[df_idx], s=0.1, marker='.', alpha=0.3, rasterized=True)
