@@ -20,7 +20,10 @@ def CornerPlot(dfs, df_names, corner_params, weights=None, bandwidth_fac=1, thre
     :weights: name of the series that contains weights for each sample
     :bandwidth_fac: multiplicative factor to the bandwidth of the KDE (values >1 make KDE smoother)
     :downsample: can specify an int which allows you to downsample the data for the 2D densities to speed things up
-    :prior: dataframe with the prior, if you want to plot this too; keys should match those in :corner_params:
+    :prior: either a dataframe or dict specifying the prior to plot
+        if a single dataframe is supplied, the code expects the dataframe to be samples from the prior
+        if a dict is supplied, it will plot an analytic prior within the :limits: for each parameter (must supply :limits:)
+            currently available analytic priors: ['uniform', 'loguniform']
     :cuts: dict allowing you to slice the data by specifying a tuple of upper and lower bounds for each parameter
     :limits: dict of tuples for the limits of each parameter for the KDE evaluation (so it doesn't go outside the bounds)
     :plot_limits: dict of tuples for the plotting limits of each parameter
@@ -115,14 +118,27 @@ def CornerPlot(dfs, df_names, corner_params, weights=None, bandwidth_fac=1, thre
                             alpha=0.4, orientation="vertical", label=None)
 
             # plot prior distributions, if provided
-            if (prior is not None) and (df_idx==len(dfs)-1):
-                if prior[param] is not None:
-                    prior_data = np.asarray(prior[param])
-                    sns.kdeplot(data=prior_data, ax=marg_axs[idx], bw_adjust=bandwidth_fac, \
-                                gridsize=1000, color='k', lw=1, linestyle=':', vertical=False, label='prior')
-                    if plot_hist==True:
-                        _ = marg_axs[idx].hist(prior_data, density=True, weights=_weights, histtype='step', color='k', bins=Nbins, \
-                                    alpha=0.4, linestyle=':', lw=1, orientation="vertical")
+            if prior is not None:
+                if (type(prior)==dict) and (df_idx==len(dfs)-1):
+                    # plot analytic prior
+                    xvals = np.linspace(_limits[param], 1000)
+                    if prior[param]=='uniform':
+                        marg_axs[idx].plot(xvals, np.ones_like(xvals)/(_limits[param][1] - _limits[param][0]), \
+                                    color='k', alpha=0.4, zorder=-20, label='prior')
+                    elif prior[param]=='loguniform':
+                        marg_axs[idx].plot(xvals, np.ones_like(xvals)/(xvals*np.log(_limits[param][1] / _limits[param][0])), \
+                                    color='k', alpha=0.4, zorder=-20, label='prior')
+                    else:
+                        raise NameError('The analytic prior you provided for parameter {:s} ({:s}) is not defined!'.format(param, prior[param]))
+                else:
+                    # plot prior samples in the supplied dataframe
+                    if prior[param] is not None:
+                        prior_data = np.asarray(prior[param])
+                        sns.kdeplot(data=prior_data, ax=marg_axs[idx], bw_adjust=bandwidth_fac, \
+                                    gridsize=1000, color='k', lw=1, linestyle=':', zorder=-20, vertical=False, label='prior')
+                        if plot_hist==True:
+                            _ = marg_axs[idx].hist(prior_data, density=True, weights=_weights, histtype='step', color='k', bins=Nbins, \
+                                        alpha=0.4, linestyle=':', lw=1, zorder=-20, orientation="vertical")
 
             # plot median and credible range for the specified threshold values
             median = np.median(param_data)
@@ -203,15 +219,20 @@ def CornerPlot(dfs, df_names, corner_params, weights=None, bandwidth_fac=1, thre
                 ### PLOT JOINT DISTRIBUTIONS ###
                 thresholds = [1-t/100.0 for t in thresh[::-1]]
 
+                if _shade==False:
+                    _linewidths = np.linspace(1,3,len(thresholds))
+                else:
+                    _linewidths = None
+
                 if fill_col is not None:
                     thresholds.append(1)
                     sns.kdeplot(x=param_data, y=joint_param_data, ax=joint_ax, weights=_weights, bw_adjust=bandwidth_fac, \
                                 levels=thresholds, clip=(_limits[param],_limits[joint_param]), \
-                                cmap=_cmap, shade=_shade, alpha=0.7, linewidths=np.linspace(1,3,len(thresholds)))
+                                cmap=_cmap, shade=_shade, alpha=0.7, linewidths=_linewidths)
                 else:
                     sns.kdeplot(x=param_data, y=joint_param_data, ax=joint_ax, weights=_weights, bw_adjust=bandwidth_fac, \
                                 levels=thresholds, clip=(_limits[param],_limits[joint_param]), colors=[col], \
-                                cmap=None, shade=_shade, alpha=0.7, linewidths=np.linspace(1,3,len(thresholds)))
+                                cmap=None, shade=_shade, alpha=0.7, linewidths=_linewidths)
                 if plot_pts==True:
                     joint_ax.scatter(param_data, joint_param_data, \
                                  color=colors[df_idx], s=0.1, marker='.', alpha=0.3, rasterized=True)
