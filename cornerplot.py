@@ -130,7 +130,7 @@ def CornerPlot(dfs, df_names, corner_params, weights=None, bandwidth_fac=1, thre
                                     color='k', alpha=0.4, zorder=-20, label='prior')
                     else:
                         raise NameError('The analytic prior you provided for parameter {:s} ({:s}) is not defined!'.format(param, prior[param]))
-                else:
+                elif (df_idx==len(dfs)-1):
                     # plot prior samples in the supplied dataframe
                     if prior[param] is not None:
                         prior_data = np.asarray(prior[param])
