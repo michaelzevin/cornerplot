@@ -119,7 +119,7 @@ def CornerPlot(dfs, df_names, corner_params, weights=None, bandwidth_fac=1, thre
 
             # plot prior distributions, if provided
             if prior is not None:
-                if (type(prior)==dict) and (df_idx==len(dfs)-1):
+                if (type(prior)==dict) and (df_idx==0):
                     # plot analytic prior
                     xvals = np.linspace(_limits[param], 1000)
                     if prior[param]=='uniform':
@@ -128,9 +128,11 @@ def CornerPlot(dfs, df_names, corner_params, weights=None, bandwidth_fac=1, thre
                     elif prior[param]=='loguniform':
                         marg_axs[idx].plot(xvals, np.ones_like(xvals)/(xvals*np.log(_limits[param][1] / _limits[param][0])), \
                                     color='k', alpha=0.4, zorder=-20, label='prior')
+                    elif prior[param]==None:
+                        continue
                     else:
                         raise NameError('The analytic prior you provided for parameter {:s} ({:s}) is not defined!'.format(param, prior[param]))
-                elif (df_idx==len(dfs)-1):
+                elif (df_idx==0):
                     # plot prior samples in the supplied dataframe
                     if prior[param] is not None:
                         prior_data = np.asarray(prior[param])
