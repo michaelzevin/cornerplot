@@ -124,10 +124,10 @@ def CornerPlot(dfs, df_names, corner_params, weights=None, bandwidth_fac=1, thre
                     xvals = np.linspace(_limits[param], 1000)
                     if prior[param]=='uniform':
                         marg_axs[idx].plot(xvals, np.ones_like(xvals)/(_limits[param][1] - _limits[param][0]), \
-                                    color='k', alpha=0.4, zorder=-20, label='prior')
+                                    color='k', alpha=0.4, linestyle='--', zorder=-20, label='prior')
                     elif prior[param]=='loguniform':
                         marg_axs[idx].plot(xvals, np.ones_like(xvals)/(xvals*np.log(_limits[param][1] / _limits[param][0])), \
-                                    color='k', alpha=0.4, zorder=-20, label='prior')
+                                    color='k', alpha=0.4, linestyle='--', zorder=-20, label='prior')
                     elif prior[param]==None:
                         continue
                     else:
@@ -145,7 +145,7 @@ def CornerPlot(dfs, df_names, corner_params, weights=None, bandwidth_fac=1, thre
             # plot median and credible range for the specified threshold values
             median = np.median(param_data)
             if mark_median==True:
-                marg_axs[idx].axvline(median, color=colors[df_idx], linestyle=':')
+                marg_axs[idx].axvline(median, color=colors[df_idx], linestyle=':', zorder=5)
             if mark_credible==True:
                 for tidx, t in enumerate(thresh):
                     cred_low = np.percentile(param_data, (100-t)/2.0)
@@ -161,6 +161,9 @@ def CornerPlot(dfs, df_names, corner_params, weights=None, bandwidth_fac=1, thre
             if _ticks[param] is not None:
                 marg_axs[idx].set_xticks(_ticks[param])
                 marg_axs[idx].set_yticklabels([])
+
+            # adjust gridlines
+            marg_axs[idx].grid(alpha=0.5)
 
             # remove labels for marginalized axes except for last one
             if param==corner_params[-1]:
@@ -216,13 +219,13 @@ def CornerPlot(dfs, df_names, corner_params, weights=None, bandwidth_fac=1, thre
                 # plot median value
                 median_joint = np.median(joint_param_data)
                 if mark_median==True:
-                    joint_ax.scatter(median, median_joint, marker='X', color=colors[df_idx], s=75)
+                    joint_ax.scatter(median, median_joint, marker='X', alpha=0.7, color=colors[df_idx], s=75, zorder=5)
 
                 ### PLOT JOINT DISTRIBUTIONS ###
                 thresholds = [1-t/100.0 for t in thresh[::-1]]
 
                 if _shade==False:
-                    _linewidths = np.linspace(1,3,len(thresholds))
+                    _linewidths = np.linspace(2,4,len(thresholds))
                 else:
                     _linewidths = None
 
@@ -230,11 +233,11 @@ def CornerPlot(dfs, df_names, corner_params, weights=None, bandwidth_fac=1, thre
                     thresholds.append(1)
                     sns.kdeplot(x=param_data, y=joint_param_data, ax=joint_ax, weights=_weights, bw_adjust=bandwidth_fac, \
                                 levels=thresholds, clip=(_limits[param],_limits[joint_param]), \
-                                cmap=_cmap, shade=_shade, alpha=0.7, linewidths=_linewidths)
+                                cmap=_cmap, shade=_shade, alpha=0.6, linewidths=_linewidths, zorder=-10)
                 else:
                     sns.kdeplot(x=param_data, y=joint_param_data, ax=joint_ax, weights=_weights, bw_adjust=bandwidth_fac, \
                                 levels=thresholds, clip=(_limits[param],_limits[joint_param]), colors=[col], \
-                                cmap=None, shade=_shade, alpha=0.7, linewidths=_linewidths)
+                                cmap=None, shade=_shade, alpha=0.6, linewidths=_linewidths)
                 if plot_pts==True:
                     joint_ax.scatter(param_data, joint_param_data, \
                                  color=colors[df_idx], s=0.1, marker='.', alpha=0.3, rasterized=True)
@@ -248,6 +251,9 @@ def CornerPlot(dfs, df_names, corner_params, weights=None, bandwidth_fac=1, thre
                     joint_ax.set_xticks(_ticks[param])
                 if _ticks[joint_param] is not None:
                     joint_ax.set_yticks(_ticks[joint_param])
+
+                # adjust gridlines
+                joint_ax.grid(alpha=0.5)
 
                 # adjust labels, if provided, and remove ticks from middle plots
                 xlbl = _labels[param] if _labels[param] is not None else param
